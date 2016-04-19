@@ -16,7 +16,6 @@ import (
 
 type pixel struct {
 	r, g, b, a uint8
-	normal     float32
 }
 
 func main() {
@@ -80,7 +79,7 @@ func getImages(dir string, resX uint, resY uint, normal bool) [][]pixel {
 	var images [][]pixel
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		fmt.Println("erro", dir)
+		fmt.Println("erro:", dir)
 		os.Exit(1)
 	}
 
@@ -90,8 +89,14 @@ func getImages(dir string, resX uint, resY uint, normal bool) [][]pixel {
 		}
 
 		img := loadImage(path)
+		saveFile("1-"+info.Name(), img)
 		img = resize.Resize(resX, resY, img, resize.Lanczos3)
-		pixels := getPixels(img, normal)
+		saveFile("2-"+info.Name(), img)
+		img = escalaCinza(img)
+		saveFile("3-"+info.Name(), img)
+		img = escalaPretoBranco(img)
+		saveFile("4-"+info.Name(), img)
+		pixels := getPixels(img)
 		images = append(images, pixels)
 		return nil
 
@@ -115,26 +120,79 @@ func loadImage(filename string) image.Image {
 	return img
 }
 
-func getPixels(img image.Image, normal bool) []pixel {
+func getPixels(img image.Image) []pixel {
 
 	bounds := img.Bounds()
 	pixels := make([]pixel, bounds.Dx()*bounds.Dy())
 
-	for i := 0; i < bounds.Dx()*bounds.Dy(); i++ {
-		x := i % bounds.Dx()
-		y := i / bounds.Dx()
-
-		r, g, b, a := color.GrayModel.Convert(img.At(x, y)).RGBA()
-
-		pixels[i].r = uint8(r)
-		pixels[i].g = uint8(g)
-		pixels[i].b = uint8(b)
-		pixels[i].a = uint8(a)
+	i := 0
+	for x := 0; x < bounds.Max.X; x++ {
+		for y := 0; y < bounds.Max.Y; y++ {
+			r, g, b, a := img.At(x, y).RGBA()
+			pixels[i].r = uint8(r)
+			pixels[i].g = uint8(g)
+			pixels[i].b = uint8(b)
+			pixels[i].a = uint8(a)
+			i++
+		}
 	}
+
 	return pixels
+}
+
+func escalaCinza(img image.Image) image.Image {
+	bounds := img.Bounds()
+	w, h := bounds.Max.X, bounds.Max.Y
+	imgRect := image.Rect(0, 0, w, h)
+	gray := image.NewGray(imgRect)
+
+	for x := 0; x < w; x++ {
+		for y := 0; y < h; y++ {
+			oldColor := img.At(x, y)
+			grayColor := color.GrayModel.Convert(oldColor)
+			gray.Set(x, y, grayColor)
+		}
+	}
+	return gray
+}
+
+func escalaPretoBranco(img image.Image) image.Image {
+	bounds := img.Bounds()
+	w, h := bounds.Max.X, bounds.Max.Y
+	imgRect := image.Rect(0, 0, w, h)
+	gray := image.NewGray(imgRect)
+
+	for x := 0; x < w; x++ {
+		for y := 0; y < h; y++ {
+			r, _, _, _ := img.At(x, y).RGBA()
+			if r > 32767 {
+				r = 255
+			} else {
+				r = 0
+			}
+			//gray.Set(x, y, color.Gray{uint8((r*299 + g*587 + b*114) / 1000)})
+			gray.Set(x, y, color.Gray{uint8(r)})
+
+		}
+	}
+	return gray
 }
 
 func normalization(value uint8) float64 {
 	return float64(value) / 255.0
+
+}
+
+func saveFile(path string, file image.Image) {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		fmt.Println("erro:", err)
+	}
+	defer f.Close()
+
+	err = png.Encode(f, file)
+	if err != nil {
+		fmt.Println("erro:", err)
+	}
 
 }
