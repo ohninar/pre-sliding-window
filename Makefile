@@ -6,3 +6,9 @@ gerar-gray:
 
 gerar-gray-normalizado:
 	sh gray-normalizado.sh
+
+gerar-black-and-white:
+	sh black-and-white.sh
+
+gerar-black-and-white-normalizado:
+	sh black-and-white-normalizado.sh

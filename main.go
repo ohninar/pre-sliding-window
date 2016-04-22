@@ -36,19 +36,20 @@ func main() {
 
 	flag.Usage = func() {
 		fmt.Printf("Usage of %s:\n", os.Args[0])
-		fmt.Printf("    -path=\"./in_imagens\" -resX=30 -resY=30 -normal=false -label=0\n")
+		fmt.Printf("    -path=\"./in_imagens\" -resX=30 -resY=30 -baw=false -normal=false -label=0\n")
 		flag.PrintDefaults()
 	}
 
 	pathImages := flag.String("path", "/tmp", "a string")
 	resX := flag.Int("resX", 30, "an int")
 	resY := flag.Int("resY", 30, "an int")
+	blackAndWhite := flag.Bool("baw", false, "a bool")
 	normal := flag.Bool("normal", false, "a bool")
 	label := flag.Int("label", 0, "an int")
 
 	flag.Parse()
 
-	if len(os.Args) != 6 {
+	if len(os.Args) != 7 {
 		flag.Usage()
 		fmt.Println(flag.Args())
 		fmt.Println(flag.NArg())
@@ -57,7 +58,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	images := getImages(*pathImages, uint(*resX), uint(*resY), *normal)
+	images := getImages(*pathImages, uint(*resX), uint(*resY), *normal, *blackAndWhite)
 
 	for _, img := range images {
 		matrix := ""
@@ -74,7 +75,7 @@ func main() {
 
 }
 
-func getImages(dir string, resX uint, resY uint, normal bool) [][]pixel {
+func getImages(dir string, resX uint, resY uint, normal bool, blackAndWhite bool) [][]pixel {
 
 	var images [][]pixel
 
@@ -89,13 +90,15 @@ func getImages(dir string, resX uint, resY uint, normal bool) [][]pixel {
 		}
 
 		img := loadImage(path)
-		saveFile("1-"+info.Name(), img)
+		//saveFile("1-"+info.Name(), img)
 		img = resize.Resize(resX, resY, img, resize.Lanczos3)
-		saveFile("2-"+info.Name(), img)
+		//saveFile("2-"+info.Name(), img)
 		img = escalaCinza(img)
-		saveFile("3-"+info.Name(), img)
-		img = escalaPretoBranco(img)
-		saveFile("4-"+info.Name(), img)
+		//saveFile("3-"+info.Name(), img)
+		if blackAndWhite {
+			img = escalaPretoBranco(img)
+		}
+		//saveFile("4-"+info.Name(), img)
 		pixels := getPixels(img)
 		images = append(images, pixels)
 		return nil
