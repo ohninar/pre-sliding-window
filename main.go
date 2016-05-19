@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/nfnt/resize"
 )
@@ -19,20 +20,6 @@ type pixel struct {
 }
 
 func main() {
-	/* O que preciso fazer:
-		   1) (OK) Percorrer o diretório por imagens;
-		   2) (OK) Abrir imagens;
-		   3) (OK) Transformar em 30x30;
-		   4) (OK) Transformar em preto e branco;
-		   5) (OK) Obter valor decimal de cada pixel;
-		   6) (OK) Organizar a saída como uma linha de matriz;
-		   7) Subistituir os valores de pixel entre 0 e 1;
-		   8) Incluir na última coluna com o label que identifique a imagem entre alpha-numeric
-
-	     Matriz 0 255 cinza
-	     Matriz normalizada cinza
-	     Matriz preto e branco
-	*/
 
 	flag.Usage = func() {
 		fmt.Printf("Usage of %s:\n", os.Args[0])
@@ -88,17 +75,18 @@ func getImages(dir string, resX uint, resY uint, normal bool, blackAndWhite bool
 		if info.IsDir() {
 			return nil
 		}
-
+		fmt.Println(path)
 		img := loadImage(path)
-		//saveFile("1-"+info.Name(), img)
+		//saveFile("debug/1-"+strings.Replace(path, "/", "-", -1), img)
 		img = resize.Resize(resX, resY, img, resize.Lanczos3)
-		//saveFile("2-"+info.Name(), img)
+		//saveFile("debug/2-"+strings.Replace(path, "/", "-", -1), img)
 		img = escalaCinza(img)
-		//saveFile("3-"+info.Name(), img)
+		//saveFile("debug/3-"+strings.Replace(path, "/", "-", -1), img)
 		if blackAndWhite {
 			img = escalaPretoBranco(img)
 		}
-		//saveFile("4-"+info.Name(), img)
+		img = checkBackground(img)
+		saveFile("debug/4-"+strings.Replace(path, "/", "-", -1), img)
 		pixels := getPixels(img)
 		images = append(images, pixels)
 		return nil
@@ -164,21 +152,86 @@ func escalaPretoBranco(img image.Image) image.Image {
 	w, h := bounds.Max.X, bounds.Max.Y
 	imgRect := image.Rect(0, 0, w, h)
 	gray := image.NewGray(imgRect)
+	total := uint32(0)
+	media := uint32(0)
 
 	for x := 0; x < w; x++ {
 		for y := 0; y < h; y++ {
 			r, _, _, _ := img.At(x, y).RGBA()
-			if r > 32767 {
+			total = total + r
+		}
+	}
+
+	media = total / uint32(w*h)
+
+	for x := 0; x < w; x++ {
+		for y := 0; y < h; y++ {
+			r, _, _, _ := img.At(x, y).RGBA()
+
+			if r > media {
 				r = 255
 			} else {
 				r = 0
 			}
-			//gray.Set(x, y, color.Gray{uint8((r*299 + g*587 + b*114) / 1000)})
+
 			gray.Set(x, y, color.Gray{uint8(r)})
 
 		}
 	}
 	return gray
+}
+
+func checkBackground(img image.Image) image.Image {
+	bounds := img.Bounds()
+	w, h := bounds.Max.X, bounds.Max.Y
+	imgRect := image.Rect(0, 0, w, h)
+	gray := image.NewGray(imgRect)
+	changeBackground := false
+	total := uint32(0)
+	totalEsquerda := uint32(0)
+	totalDireita := uint32(0)
+	totalBaixo := uint32(0)
+	totalCima := uint32(0)
+
+	for y := 0; y < h; y++ {
+		r, _, _, _ := img.At(0, y).RGBA()
+		totalEsquerda = totalEsquerda + r
+		r, _, _, _ = img.At(w, y).RGBA()
+		totalDireita = totalDireita + r
+	}
+
+	for x := 0; x < w; x++ {
+		r, _, _, _ := img.At(x, 0).RGBA()
+		totalBaixo = totalBaixo + r
+		r, _, _, _ = img.At(x, h).RGBA()
+		totalCima = totalCima + r
+	}
+
+	total = totalBaixo + totalCima + totalDireita + totalEsquerda
+
+	if total < 1966050 {
+		fmt.Print("troca\n")
+		changeBackground = true
+	}
+
+	if changeBackground {
+		for x := 0; x < w; x++ {
+			for y := 0; y < h; y++ {
+				r, _, _, _ := img.At(x, y).RGBA()
+
+				if r == 0 {
+					r = 255
+				} else {
+					r = 0
+				}
+
+				gray.Set(x, y, color.Gray{uint8(r)})
+
+			}
+		}
+		return gray
+	}
+	return img
 }
 
 func normalization(value uint8) float64 {
